@@ -365,7 +365,7 @@ if collection_users and "👥 Utilisateurs" in available_tabs:
             if users:
                 st.success(f"👥 {len(users)} utilisateurs trouvés")
                 for u in users:
-                    with st.expander(f"👤 {u.get('nom', 'Sans nom')} - {u.get('email', \"Pas d'email\")}"):
+                    with st.expander(f"👤 {u.get('nom', 'Sans nom')} - {u.get('email', 'Pas d\\'email')}"):
                         st.markdown(f"""
                         **📧 Email**: {u.get('email', 'Non spécifié')}  
                         **🏠 Adresse**: {u.get('adresse', 'Non spécifiée')}  
