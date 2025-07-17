@@ -10,21 +10,26 @@ import numpy as np
 # Chargement variables d'environnement
 load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
-DB_NAME = os.getenv("MONGO_DB")
-COLLECTION_NAME = os.getenv("MONGO_COLLECTION")
+DB_NAME = os.getenv("MONGO_DB") or os.getenv("DB_NAME")
+COLLECTION_NAME = os.getenv("MONGO_COLLECTION") or "produits"
 COLLECTION_UTILISATEURS = os.getenv("MONGO_COLLECTION_UTILISATEURS")
 COLLECTION_PANIERS = os.getenv("MONGO_COLLECTION_PANIERS")
 COLLECTION_COMMANDES = os.getenv("MONGO_COLLECTION_COMMANDES")
 COLLECTION_AVIS = os.getenv("MONGO_COLLECTION_AVIS")
 
+# Vérifier les variables
+if not MONGO_URI or not DB_NAME:
+    st.error("❌ Variables d'environnement manquantes.")
+    st.stop()
+
 # Connexion MongoDB
 client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
 collection = db[COLLECTION_NAME]
-collection_users = db[COLLECTION_UTILISATEURS]
-collection_paniers = db[COLLECTION_PANIERS]
-collection_commandes = db[COLLECTION_COMMANDES]
-collection_avis = db[COLLECTION_AVIS]
+collection_users = db[COLLECTION_UTILISATEURS] if COLLECTION_UTILISATEURS else None
+collection_paniers = db[COLLECTION_PANIERS] if COLLECTION_PANIERS else None
+collection_commandes = db[COLLECTION_COMMANDES] if COLLECTION_COMMANDES else None
+collection_avis = db[COLLECTION_AVIS] if COLLECTION_AVIS else None
 
 # Config Streamlit
 st.set_page_config(
@@ -221,7 +226,20 @@ def create_section(title):
     st.markdown(f'<div class="section"><div class="section-title">{title}</div>', unsafe_allow_html=True)
 
 # --- Onglets principaux ---
-tabs = st.tabs(["📦 Produits", "👥 Utilisateurs", "🛒 Paniers", "📋 Commandes", "⭐ Avis"])
+tab_titles = ["📦 Produits", "👥 Utilisateurs", "🛒 Paniers", "📋 Commandes", "⭐ Avis"]
+# Ne garder que les onglets pour lesquels nous avons les collections
+available_tabs = []
+if collection_users:
+    available_tabs.append(tab_titles[1])
+if collection_paniers:
+    available_tabs.append(tab_titles[2])
+if collection_commandes:
+    available_tabs.append(tab_titles[3])
+if collection_avis:
+    available_tabs.append(tab_titles[4])
+
+# Toujours afficher l'onglet Produits en premier
+tabs = st.tabs(["📦 Produits"] + available_tabs)
 
 # ====================
 # ==== PRODUITS ======
@@ -232,12 +250,27 @@ with tabs[0]:
 
     # Afficher
     with prod_tab[0]:
-        produits = list(collection.find())
+        # Barre de recherche
+        search_term = st.text_input("🔍 Rechercher un produit par nom")
+        
+        query = {}
+        if search_term:
+            query["nom"] = {"$regex": search_term, "$options": "i"}
+            
+        produits = list(collection.find(query))
         if produits:
             st.success(f"📊 {len(produits)} produits trouvés")
             for p in produits:
-                with st.expander(f"🔹 {p['nom']} - {p['prix']}€ (Stock: {p['stock']})"):
-                    st.json(p)
+                with st.expander(f"🔹 {p.get('nom', 'Sans nom')} - {p.get('prix', 0)}€ (Stock: {p.get('stock', 0)})"):
+                    st.markdown(f"""
+                    **🆔 ID**: `{p.get('_id')}`  
+                    **📦 Nom**: {p.get('nom', 'Non spécifié')}  
+                    **💰 Prix**: {p.get('prix', 'Non défini')} MAD  
+                    **📂 Catégorie**: {p.get('categorie', 'Non définie')}  
+                    **📝 Description**: {p.get('description', 'Aucune description')}  
+                    **📅 Date création**: {p.get('date_creation', 'Inconnue')}  
+                    **⭐ Popularité**: {p.get('popularite', 0)}  
+                    """)
         else:
             st.info("Aucun produit trouvé.")
 
@@ -306,332 +339,352 @@ with tabs[0]:
                 if produits:
                     st.success(f"🔎 {len(produits)} produits correspondent aux critères")
                     for p in produits:
-                        with st.expander(f"{p['nom']} - {p['prix']}€"):
-                            st.json(p)
+                        with st.expander(f"{p.get('nom', 'Sans nom')} - {p.get('prix', 0)}€"):
+                            st.markdown(f"""
+                            **📦 Nom**: {p.get('nom', 'Non spécifié')}  
+                            **💰 Prix**: {p.get('prix', 'Non défini')} MAD  
+                            **📂 Catégorie**: {p.get('categorie', 'Non définie')}  
+                            **📝 Description**: {p.get('description', 'Aucune description')}  
+                            **📅 Date création**: {p.get('date_creation', 'Inconnue')}  
+                            **⭐ Popularité**: {p.get('popularite', 0)}  
+                            **📊 Stock**: {p.get('stock', 0)}  
+                            """)
                 else:
                     st.warning("Aucun produit ne correspond aux critères.")
 
 # =========================
 # ==== UTILISATEURS =======
 # =========================
-with tabs[1]:
-    create_section("Gestion des utilisateurs")
-    user_tab = st.tabs(["📋 Afficher", "➕ Ajouter", "🗑️ Supprimer"])
+if collection_users and "👥 Utilisateurs" in available_tabs:
+    with tabs[tab_titles.index("👥 Utilisateurs")]:
+        create_section("Gestion des utilisateurs")
+        user_tab = st.tabs(["📋 Afficher", "➕ Ajouter", "🗑️ Supprimer"])
 
-    with user_tab[0]:
-        users = list(collection_users.find())
-        if users:
-            st.success(f"👥 {len(users)} utilisateurs trouvés")
-            for u in users:
-                with st.expander(f"👤 {u['nom']} - {u['email']}"):
-                    st.json(u)
-                    historique = u.get("historique_achats", [])
-                    if historique:
-                        st.markdown("**📜 Historique d'achats :**")
-                        for com_id in historique:
-                            com = collection_commandes.find_one({"_id": com_id})
-                            if com:
-                                st.json(com)
+        with user_tab[0]:
+            users = list(collection_users.find())
+            if users:
+                st.success(f"👥 {len(users)} utilisateurs trouvés")
+                for u in users:
+                    with st.expander(f"👤 {u.get('nom', 'Sans nom')} - {u.get('email', 'Pas d'email')}"):
+                        st.markdown(f"""
+                        **📧 Email**: {u.get('email', 'Non spécifié')}  
+                        **🏠 Adresse**: {u.get('adresse', 'Non spécifiée')}  
+                        **📞 Téléphone**: {u.get('telephone', 'Non spécifié')}  
+                        **📅 Date inscription**: {u.get('date_inscription', 'Inconnue')}  
+                        """)
+                        
+                        historique = u.get("historique_achats", [])
+                        if historique:
+                            st.markdown("**📜 Historique d'achats :**")
+                            for com_id in historique:
+                                com = collection_commandes.find_one({"_id": com_id}) if collection_commandes else None
+                                if com:
+                                    st.json(com)
+                        else:
+                            st.info("Aucun historique d'achats")
+            else:
+                st.info("Aucun utilisateur trouvé.")
+
+        with user_tab[1]:
+            with st.form("ajouter_utilisateur"):
+                cols = st.columns(2)
+                with cols[0]:
+                    nom = st.text_input("Nom*", key="user_aj_nom")
+                    email = st.text_input("Email*", key="user_aj_email")
+                with cols[1]:
+                    adresse = st.text_input("Adresse*", key="user_aj_adresse")
+                    telephone = st.text_input("Téléphone", key="user_aj_tel")
+                
+                if st.form_submit_button("➕ Ajouter utilisateur"):
+                    if nom and email and adresse:
+                        if collection_users.find_one({"email": email}):
+                            st.error("Cet email est déjà utilisé")
+                        else:
+                            collection_users.insert_one({
+                                "nom": nom,
+                                "email": email,
+                                "adresse": adresse,
+                                "telephone": telephone,
+                                "date_inscription": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "historique_achats": []
+                            })
+                            st.success("Utilisateur ajouté avec succès ✅")
                     else:
-                        st.info("Aucun historique d'achats")
-        else:
-            st.info("Aucun utilisateur trouvé.")
+                        st.warning("Veuillez remplir les champs obligatoires (*)")
 
-    with user_tab[1]:
-        with st.form("ajouter_utilisateur"):
-            cols = st.columns(2)
-            with cols[0]:
-                nom = st.text_input("Nom*", key="user_aj_nom")
-                email = st.text_input("Email*", key="user_aj_email")
-            with cols[1]:
-                adresse = st.text_input("Adresse*", key="user_aj_adresse")
-                telephone = st.text_input("Téléphone", key="user_aj_tel")
-            
-            if st.form_submit_button("➕ Ajouter utilisateur"):
-                if nom and email and adresse:
-                    if collection_users.find_one({"email": email}):
-                        st.error("Cet email est déjà utilisé")
+        with user_tab[2]:
+            with st.form("supprimer_utilisateur"):
+                users_list = [u["email"] for u in collection_users.find()]
+                user_email = st.selectbox("Sélectionner un utilisateur", users_list, key="user_sup_select")
+                
+                if st.form_submit_button("🗑️ Supprimer"):
+                    result = collection_users.delete_one({"email": user_email})
+                    if result.deleted_count:
+                        st.success("Utilisateur supprimé avec succès ✅")
                     else:
-                        collection_users.insert_one({
-                            "nom": nom,
-                            "email": email,
-                            "adresse": adresse,
-                            "telephone": telephone,
-                            "date_inscription": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "historique_achats": []
-                        })
-                        st.success("Utilisateur ajouté avec succès ✅")
-                else:
-                    st.warning("Veuillez remplir les champs obligatoires (*)")
-
-    with user_tab[2]:
-        with st.form("supprimer_utilisateur"):
-            users_list = [u["email"] for u in collection_users.find()]
-            user_email = st.selectbox("Sélectionner un utilisateur", users_list, key="user_sup_select")
-            
-            if st.form_submit_button("🗑️ Supprimer"):
-                result = collection_users.delete_one({"email": user_email})
-                if result.deleted_count:
-                    st.success("Utilisateur supprimé avec succès ✅")
-                else:
-                    st.error("Erreur lors de la suppression")
+                        st.error("Erreur lors de la suppression")
 
 # =====================
 # ==== PANIERS ========
 # =====================
-with tabs[2]:
-    create_section("Gestion des paniers")
-    panier_tab = st.tabs(["📋 Afficher", "➕ Ajouter", "🗑️ Supprimer"])
+if collection_paniers and "🛒 Paniers" in available_tabs:
+    with tabs[tab_titles.index("🛒 Paniers")]:
+        create_section("Gestion des paniers")
+        panier_tab = st.tabs(["📋 Afficher", "➕ Ajouter", "🗑️ Supprimer"])
 
-    with panier_tab[0]:
-        paniers = list(collection_paniers.find())
-        if paniers:
-            st.success(f"🛒 {len(paniers)} paniers trouvés")
-            for p in paniers:
-                with st.expander(f"🛍️ Panier de {p['utilisateur']} - Total: {p['total']}€"):
-                    st.json(p)
-        else:
-            st.info("Aucun panier trouvé.")
-
-    with panier_tab[1]:
-        with st.form("ajouter_panier"):
-            utilisateurs = [u["email"] for u in collection_users.find()]
-            if not utilisateurs:
-                st.warning("Aucun utilisateur disponible.")
+        with panier_tab[0]:
+            paniers = list(collection_paniers.find())
+            if paniers:
+                st.success(f"🛒 {len(paniers)} paniers trouvés")
+                for p in paniers:
+                    with st.expander(f"🛍️ Panier de {p.get('utilisateur', 'Inconnu')} - Total: {p.get('total', 0)}€"):
+                        st.json(p)
             else:
-                utilisateur = st.selectbox("Utilisateur*", utilisateurs, key="panier_aj_utilisateur")
-                produits = [p["nom"] for p in collection.find()]
-                
-                st.markdown("**📦 Sélection des produits :**")
-                cols = st.columns(2)
-                quantites = {}
-                for i, produit in enumerate(produits):
-                    with cols[i % 2]:
-                        qte = st.number_input(
-                            f"Quantité pour {produit}",
-                            0, 
-                            key=f"panier_aj_qte_{produit}",
-                            help=f"Stock disponible: {collection.find_one({'nom': produit})['stock']}"
-                        )
-                        if qte > 0:
-                            quantites[produit] = qte
-                
-                if st.form_submit_button("➕ Ajouter panier"):
-                    if utilisateur and quantites:
-                        total = sum(collection.find_one({"nom": p})["prix"] * q for p, q in quantites.items())
-                        collection_paniers.insert_one({
-                            "utilisateur": utilisateur,
-                            "produits": quantites,
-                            "total": total,
-                            "date_creation": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        })
-                        st.success(f"Panier ajouté avec succès ✅ Total: {total:.2f} €")
-                    else:
-                        st.warning("Veuillez sélectionner au moins un produit")
+                st.info("Aucun panier trouvé.")
 
-    with panier_tab[2]:
-        with st.form("supprimer_panier"):
-            paniers_list = [p["utilisateur"] for p in collection_paniers.find()]
-            if not paniers_list:
-                st.info("Aucun panier à supprimer")
-            else:
-                panier_user = st.selectbox("Sélectionner un panier", paniers_list, key="panier_sup_select")
-                
-                if st.form_submit_button("🗑️ Supprimer"):
-                    result = collection_paniers.delete_one({"utilisateur": panier_user})
-                    if result.deleted_count:
-                        st.success("Panier supprimé avec succès ✅")
-                    else:
-                        st.error("Erreur lors de la suppression")
+        with panier_tab[1]:
+            with st.form("ajouter_panier"):
+                utilisateurs = [u["email"] for u in collection_users.find()] if collection_users else []
+                if not utilisateurs:
+                    st.warning("Aucun utilisateur disponible.")
+                else:
+                    utilisateur = st.selectbox("Utilisateur*", utilisateurs, key="panier_aj_utilisateur")
+                    produits = [p["nom"] for p in collection.find()]
+                    
+                    st.markdown("**📦 Sélection des produits :**")
+                    cols = st.columns(2)
+                    quantites = {}
+                    for i, produit in enumerate(produits):
+                        with cols[i % 2]:
+                            qte = st.number_input(
+                                f"Quantité pour {produit}",
+                                0, 
+                                key=f"panier_aj_qte_{produit}",
+                                help=f"Stock disponible: {collection.find_one({'nom': produit})['stock']}"
+                            )
+                            if qte > 0:
+                                quantites[produit] = qte
+                    
+                    if st.form_submit_button("➕ Ajouter panier"):
+                        if utilisateur and quantites:
+                            total = sum(collection.find_one({"nom": p})["prix"] * q for p, q in quantites.items())
+                            collection_paniers.insert_one({
+                                "utilisateur": utilisateur,
+                                "produits": quantites,
+                                "total": total,
+                                "date_creation": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            })
+                            st.success(f"Panier ajouté avec succès ✅ Total: {total:.2f} €")
+                        else:
+                            st.warning("Veuillez sélectionner au moins un produit")
+
+        with panier_tab[2]:
+            with st.form("supprimer_panier"):
+                paniers_list = [p["utilisateur"] for p in collection_paniers.find()]
+                if not paniers_list:
+                    st.info("Aucun panier à supprimer")
+                else:
+                    panier_user = st.selectbox("Sélectionner un panier", paniers_list, key="panier_sup_select")
+                    
+                    if st.form_submit_button("🗑️ Supprimer"):
+                        result = collection_paniers.delete_one({"utilisateur": panier_user})
+                        if result.deleted_count:
+                            st.success("Panier supprimé avec succès ✅")
+                        else:
+                            st.error("Erreur lors de la suppression")
 
 # ======================
 # ==== COMMANDES =======
 # ======================
-with tabs[3]:
-    create_section("Gestion des commandes")
-    commandes_tab = st.tabs(["📋 Afficher", "➕ Créer", "🗑️ Supprimer"])
+if collection_commandes and "📋 Commandes" in available_tabs:
+    with tabs[tab_titles.index("📋 Commandes")]:
+        create_section("Gestion des commandes")
+        commandes_tab = st.tabs(["📋 Afficher", "➕ Créer", "🗑️ Supprimer"])
 
-    with commandes_tab[0]:
-        commandes = list(collection_commandes.find())
-        if commandes:
-            st.success(f"📋 {len(commandes)} commandes trouvées")
-            for c in commandes:
-                with st.expander(f"📦 Commande du {c['date']} - {c['utilisateur']}"):
-                    st.json(c)
-        else:
-            st.info("Aucune commande enregistrée.")
-
-    with commandes_tab[1]:
-        with st.form("creer_commande"):
-            utilisateurs = [u["email"] for u in collection_users.find()]
-            if not utilisateurs:
-                st.warning("Aucun utilisateur trouvé.")
+        with commandes_tab[0]:
+            commandes = list(collection_commandes.find())
+            if commandes:
+                st.success(f"📋 {len(commandes)} commandes trouvées")
+                for c in commandes:
+                    with st.expander(f"📦 Commande du {c.get('date', 'Date inconnue')} - {c.get('utilisateur', 'Utilisateur inconnu')}"):
+                        st.json(c)
             else:
-                utilisateur = st.selectbox("Utilisateur*", utilisateurs, key="commande_creer_utilisateur")
-                produits = [p["nom"] for p in collection.find()]
-                
-                st.markdown("**📦 Produits commandés :**")
-                produits_choisis = st.multiselect(
-                    "Sélectionner les produits", 
-                    produits, 
-                    key="commande_creer_produits"
-                )
-                
-                quantites = {}
-                cols = st.columns(2)
-                for i, p in enumerate(produits_choisis):
-                    with cols[i % 2]:
-                        qte = st.number_input(
-                            f"Quantité pour {p}",
-                            1, 
-                            key=f"commande_creer_qte_{p}",
-                            help=f"Stock disponible: {collection.find_one({'nom': p})['stock']}"
-                        )
-                        quantites[p] = qte
-                
-                cols = st.columns(2)
-                with cols[0]:
-                    paiement = st.selectbox("Statut paiement*", ["non payé", "payé"], key="commande_creer_paiement")
-                with cols[1]:
-                    livraison = st.selectbox("Statut livraison*", ["en attente", "livré"], key="commande_creer_livraison")
-                
-                date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                
-                if st.form_submit_button("📦 Enregistrer commande"):
-                    if utilisateur and quantites:
-                        total = sum(collection.find_one({"nom": p})["prix"] * q for p, q in quantites.items())
-                        cmd = {
-                            "utilisateur": utilisateur,
-                            "produits": quantites,
-                            "date": date,
-                            "paiement": paiement,
-                            "livraison": livraison,
-                            "total": total,
-                            "statut": "en cours"
-                        }
-                        commande_id = collection_commandes.insert_one(cmd).inserted_id
-                        collection_users.update_one(
-                            {"email": utilisateur},
-                            {"$push": {"historique_achats": commande_id}}
-                        )
-                        
-                        # Mise à jour du stock
-                        for p, q in quantites.items():
-                            collection.update_one({"nom": p}, {"$inc": {"stock": -q}})
-                        
-                        st.success(f"Commande enregistrée avec succès ✅ Total: {total:.2f} €")
-                    else:
-                        st.warning("Veuillez sélectionner au moins un produit")
+                st.info("Aucune commande enregistrée.")
 
-    with commandes_tab[2]:
-        with st.form("supprimer_commande"):
-            commandes_list = [c["_id"] for c in collection_commandes.find()]
-            if not commandes_list:
-                st.info("Aucune commande à supprimer")
-            else:
-                commande_id = st.selectbox(
-                    "Sélectionner une commande",
-                    commandes_list,
-                    format_func=lambda x: str(x),
-                    key="commande_sup_select"
-                )
-                
-                if st.form_submit_button("🗑️ Supprimer"):
-                    # Trouver l'utilisateur associé pour mettre à jour son historique
-                    commande = collection_commandes.find_one({"_id": commande_id})
-                    if commande:
-                        collection_users.update_one(
-                            {"email": commande["utilisateur"]},
-                            {"$pull": {"historique_achats": commande_id}}
-                        )
+        with commandes_tab[1]:
+            with st.form("creer_commande"):
+                utilisateurs = [u["email"] for u in collection_users.find()] if collection_users else []
+                if not utilisateurs:
+                    st.warning("Aucun utilisateur trouvé.")
+                else:
+                    utilisateur = st.selectbox("Utilisateur*", utilisateurs, key="commande_creer_utilisateur")
+                    produits = [p["nom"] for p in collection.find()]
                     
-                    result = collection_commandes.delete_one({"_id": commande_id})
-                    if result.deleted_count:
-                        st.success("Commande supprimée avec succès ✅")
-                    else:
-                        st.error("Erreur lors de la suppression")
+                    st.markdown("**📦 Produits commandés :**")
+                    produits_choisis = st.multiselect(
+                        "Sélectionner les produits", 
+                        produits, 
+                        key="commande_creer_produits"
+                    )
+                    
+                    quantites = {}
+                    cols = st.columns(2)
+                    for i, p in enumerate(produits_choisis):
+                        with cols[i % 2]:
+                            qte = st.number_input(
+                                f"Quantité pour {p}",
+                                1, 
+                                key=f"commande_creer_qte_{p}",
+                                help=f"Stock disponible: {collection.find_one({'nom': p})['stock']}"
+                            )
+                            quantites[p] = qte
+                    
+                    cols = st.columns(2)
+                    with cols[0]:
+                        paiement = st.selectbox("Statut paiement*", ["non payé", "payé"], key="commande_creer_paiement")
+                    with cols[1]:
+                        livraison = st.selectbox("Statut livraison*", ["en attente", "livré"], key="commande_creer_livraison")
+                    
+                    date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    if st.form_submit_button("📦 Enregistrer commande"):
+                        if utilisateur and quantites:
+                            total = sum(collection.find_one({"nom": p})["prix"] * q for p, q in quantites.items())
+                            cmd = {
+                                "utilisateur": utilisateur,
+                                "produits": quantites,
+                                "date": date,
+                                "paiement": paiement,
+                                "livraison": livraison,
+                                "total": total,
+                                "statut": "en cours"
+                            }
+                            commande_id = collection_commandes.insert_one(cmd).inserted_id
+                            
+                            if collection_users:
+                                collection_users.update_one(
+                                    {"email": utilisateur},
+                                    {"$push": {"historique_achats": commande_id}}
+                                )
+                            
+                            # Mise à jour du stock
+                            for p, q in quantites.items():
+                                collection.update_one({"nom": p}, {"$inc": {"stock": -q}})
+                            
+                            st.success(f"Commande enregistrée avec succès ✅ Total: {total:.2f} €")
+                        else:
+                            st.warning("Veuillez sélectionner au moins un produit")
+
+        with commandes_tab[2]:
+            with st.form("supprimer_commande"):
+                commandes_list = [c["_id"] for c in collection_commandes.find()]
+                if not commandes_list:
+                    st.info("Aucune commande à supprimer")
+                else:
+                    commande_id = st.selectbox(
+                        "Sélectionner une commande",
+                        commandes_list,
+                        format_func=lambda x: str(x),
+                        key="commande_sup_select"
+                    )
+                    
+                    if st.form_submit_button("🗑️ Supprimer"):
+                        # Trouver l'utilisateur associé pour mettre à jour son historique
+                        commande = collection_commandes.find_one({"_id": commande_id})
+                        if commande and collection_users:
+                            collection_users.update_one(
+                                {"email": commande["utilisateur"]},
+                                {"$pull": {"historique_achats": commande_id}}
+                            )
+                        
+                        result = collection_commandes.delete_one({"_id": commande_id})
+                        if result.deleted_count:
+                            st.success("Commande supprimée avec succès ✅")
+                        else:
+                            st.error("Erreur lors de la suppression")
 
 # ===================
 # ==== AVIS =========
 # ===================
-with tabs[4]:
-    create_section("Gestion des avis")
-    avis_tab = st.tabs(["📋 Afficher", "➕ Ajouter", "🗑️ Supprimer"])
+if collection_avis and "⭐ Avis" in available_tabs:
+    with tabs[tab_titles.index("⭐ Avis")]:
+        create_section("Gestion des avis")
+        avis_tab = st.tabs(["📋 Afficher", "➕ Ajouter", "🗑️ Supprimer"])
 
-    with avis_tab[0]:
-        avis = list(collection_avis.find())
-        if avis:
-            st.success(f"⭐ {len(avis)} avis trouvés")
-            for a in avis:
-                with st.expander(f"🌟 {a['note']}/5 - {a['produit']} par {a['utilisateur']}"):
-                    st.json(a)
-        else:
-            st.info("Aucun avis trouvé.")
-
-    with avis_tab[1]:
-        with st.form("ajouter_avis"):
-            produits = [p["nom"] for p in collection.find()]
-            utilisateurs = [u["email"] for u in collection_users.find()]
-            
-            cols = st.columns(2)
-            with cols[0]:
-                produit = st.selectbox("Produit*", produits, key="avis_aj_prod")
-            with cols[1]:
-                utilisateur = st.selectbox("Utilisateur*", utilisateurs, key="avis_aj_user")
-            
-            commentaire = st.text_area("Commentaire*", key="avis_aj_commentaire", height=100)
-            note = st.slider("Note*", 0, 5, 3, key="avis_aj_note")
-            
-            if st.form_submit_button("⭐ Ajouter avis"):
-                if produit and utilisateur and commentaire:
-                    avis_doc = {
-                        "produit": produit,
-                        "utilisateur": utilisateur,
-                        "commentaire": commentaire,
-                        "note": note,
-                        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "valide": True
-                    }
-                    collection_avis.insert_one(avis_doc)
-                    collection.update_one({"nom": produit}, {"$inc": {"popularite": 1}})
-                    st.success("Avis ajouté avec succès ✅")
-                else:
-                    st.warning("Tous les champs marqués d'un * sont obligatoires")
-
-    with avis_tab[2]:
-        with st.form("supprimer_avis"):
-            avis_list = list(collection_avis.find())
-            if not avis_list:
-                st.info("Aucun avis à supprimer")
+        with avis_tab[0]:
+            avis = list(collection_avis.find())
+            if avis:
+                st.success(f"⭐ {len(avis)} avis trouvés")
+                for a in avis:
+                    with st.expander(f"🌟 {a.get('note', 0)}/5 - {a.get('produit', 'Produit inconnu')} par {a.get('utilisateur', 'Utilisateur inconnu')}"):
+                        st.json(a)
             else:
-                avis_options = [
-                    (str(a["_id"]), f"{a['note']}/5 - {a['produit']} par {a['utilisateur']}")
-                    for a in avis_list
-                ]
-                avis_selected = st.selectbox(
-                    "Sélectionner un avis à supprimer",
-                    [a[0] for a in avis_options],
-                    format_func=lambda x: next(a[1] for a in avis_options if a[0] == x),
-                    key="avis_sup_select"
-                )
+                st.info("Aucun avis trouvé.")
+
+        with avis_tab[1]:
+            with st.form("ajouter_avis"):
+                produits = [p["nom"] for p in collection.find()]
+                utilisateurs = [u["email"] for u in collection_users.find()] if collection_users else []
                 
-                if st.form_submit_button("🗑️ Supprimer"):
-                    try:
-                        # Décrémenter la popularité du produit
-                        avis = collection_avis.find_one({"_id": ObjectId(avis_selected)})
-                        if avis:
-                            collection.update_one(
-                                {"nom": avis["produit"]}, 
-                                {"$inc": {"popularite": -1}}
-                            )
-                        
-                        result = collection_avis.delete_one({"_id": ObjectId(avis_selected)})
-                        if result.deleted_count:
-                            st.success("Avis supprimé avec succès ✅")
-                        else:
-                            st.warning("Avis non trouvé")
-                    except Exception as e:
-                        st.error(f"Erreur : {str(e)}")
+                cols = st.columns(2)
+                with cols[0]:
+                    produit = st.selectbox("Produit*", produits, key="avis_aj_prod")
+                with cols[1]:
+                    utilisateur = st.selectbox("Utilisateur*", utilisateurs, key="avis_aj_user")
+                
+                commentaire = st.text_area("Commentaire*", key="avis_aj_commentaire", height=100)
+                note = st.slider("Note*", 0, 5, 3, key="avis_aj_note")
+                
+                if st.form_submit_button("⭐ Ajouter avis"):
+                    if produit and utilisateur and commentaire:
+                        avis_doc = {
+                            "produit": produit,
+                            "utilisateur": utilisateur,
+                            "commentaire": commentaire,
+                            "note": note,
+                            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "valide": True
+                        }
+                        collection_avis.insert_one(avis_doc)
+                        collection.update_one({"nom": produit}, {"$inc": {"popularite": 1}})
+                        st.success("Avis ajouté avec succès ✅")
+                    else:
+                        st.warning("Tous les champs marqués d'un * sont obligatoires")
+
+        with avis_tab[2]:
+            with st.form("supprimer_avis"):
+                avis_list = list(collection_avis.find())
+                if not avis_list:
+                    st.info("Aucun avis à supprimer")
+                else:
+                    avis_options = [
+                        (str(a["_id"]), f"{a.get('note', 0)}/5 - {a.get('produit', 'Produit inconnu')} par {a.get('utilisateur', 'Utilisateur inconnu')}")
+                        for a in avis_list
+                    ]
+                    avis_selected = st.selectbox(
+                        "Sélectionner un avis à supprimer",
+                        [a[0] for a in avis_options],
+                        format_func=lambda x: next(a[1] for a in avis_options if a[0] == x),
+                        key="avis_sup_select"
+                    )
+                    
+                    if st.form_submit_button("🗑️ Supprimer"):
+                        try:
+                            # Décrémenter la popularité du produit
+                            avis = collection_avis.find_one({"_id": ObjectId(avis_selected)})
+                            if avis:
+                                collection.update_one(
+                                    {"nom": avis["produit"]}, 
+                                    {"$inc": {"popularite": -1}}
+                                )
+                            
+                            result = collection_avis.delete_one({"_id": ObjectId(avis_selected)})
+                            if result.deleted_count:
+                                st.success("Avis supprimé avec succès ✅")
+                            else:
+                                st.warning("Avis non trouvé")
+                        except Exception as e:
+                            st.error(f"Erreur : {str(e)}")
 
 # Pied de page
 st.markdown("""
