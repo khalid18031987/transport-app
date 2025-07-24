@@ -507,11 +507,8 @@ with tabs[2]:
     # 2. Ajout de panier
     with panier_tab[1]:
         with st.form("ajouter_panier"):
-            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users is not None else []
-
-if not utilisateurs:
-    # Handle the case where the utilisateurs list is empty
-    print("No users found.")
+            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users else []
+            if not utilisateurs:
                 st.warning("Aucun utilisateur disponible.")
             else:
                 utilisateur = st.selectbox("Utilisateur*", utilisateurs, key="panier_aj_utilisateur")
@@ -589,7 +586,8 @@ with tabs[3]:
     # 2. Création de commande
     with commandes_tab[1]:
         with st.form("creer_commande"):
-            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users is not None else []            if not utilisateurs:
+            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users else []
+            if not utilisateurs:
                 st.warning("Aucun utilisateur trouvé.")
             else:
                 utilisateur = st.selectbox("Utilisateur*", utilisateurs, key="commande_creer_utilisateur")
@@ -709,7 +707,8 @@ with tabs[4]:
     with avis_tab[1]:
         with st.form("ajouter_avis"):
             produits = [p["nom"] for p in collection.find()] if collection else []
-            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users is not None else []            
+            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users else []
+            
             cols = st.columns(2)
             with cols[0]:
                 produit = st.selectbox("Produit*", produits, key="avis_aj_prod")
