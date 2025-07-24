@@ -1,51 +1,38 @@
-import os
+import streamlit as st
 from pymongo import MongoClient, errors
+import os
 from dotenv import load_dotenv
 
-# Charger les variables d'environnement (.env)
+# Chargement des variables d'environnement
 load_dotenv()
+MONGO_URI = os.getenv("MONGO_URI")
 
-# 🔧 Configuration : Choisissez la bonne URI
-MONGO_URI = os.getenv("MONGO_URI") or "mongodb://localhost:27017"
-
-# 📦 Nom de la base de données à utiliser
-DB_NAME = "transport_db"
-
-def connect_to_mongodb():
+def connect_to_mongodb(uri):
     try:
-        print(f"🟡 Tentative de connexion à MongoDB...\nURI: {MONGO_URI}")
-        client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-
-        # 🧪 Forcer la détection de l’état du cluster
-        client.admin.command('ping')
-
-        db = client[DB_NAME]
-        print("✅ Connexion réussie à MongoDB.")
-        return db
-
+        client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+        # Tester la connexion avec un ping
+        client.admin.command("ping")
+        return client
     except errors.ServerSelectionTimeoutError as err:
-        print("🚫 Échec de la connexion : MongoDB injoignable.")
-        print("🧩 Détails de l’erreur :", err)
-
-        if "Connection refused" in str(err):
-            print("📌 Vérifiez si MongoDB est démarré (localhost) ou si le cluster Atlas est actif.")
-            print("💡 Conseil :")
-            print(" - Si vous utilisez localhost, lancez MongoDB avec `mongod`.")
-            print(" - Si vous utilisez Atlas, vérifiez :")
-            print("     ▪️ Le cluster est actif.")
-            print("     ▪️ Votre IP est bien ajoutée dans Network Access.")
-            print("     ▪️ L’utilisateur a les bons identifiants.")
-        elif "Authentication failed" in str(err):
-            print("🔑 Erreur d’authentification : Vérifiez l'utilisateur/mot de passe.")
-        else:
-            print("🛑 Une erreur inattendue est survenue.")
-
+        st.error("🚫 Connexion impossible : le cluster MongoDB est hors ligne ou inaccessible.")
+        st.error(f"Détail de l'erreur : {err}")
+        return None
+    except errors.ConnectionFailure as err:
+        st.error("❌ Échec de connexion à MongoDB.")
+        st.error(f"Détail : {err}")
+        return None
+    except Exception as e:
+        st.error("❗ Une erreur inattendue est survenue.")
+        st.error(f"Détail : {e}")
         return None
 
-# Test de connexion
-if __name__ == "__main__":
-    db = connect_to_mongodb()
-    if db:
-        print("🎯 Accès à la base de données :", db.name)
-    else:
-        print("❌ Impossible d'accéder à la base MongoDB.")
+# Connexion
+client = connect_to_mongodb(MONGO_URI)
+
+# Utilisation de la base de données si la connexion est réussie
+if client is not None:
+    db = client["transport_db"]
+    st.success("✅ Connexion réussie à MongoDB Atlas.")
+else:
+    db = None
+    st.warning("🔌 Aucune connexion à MongoDB.")
