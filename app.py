@@ -317,7 +317,7 @@ with tabs[0]:
     # 1. Affichage des produits
     with prod_tab[0]:
         if check_connection():
-            produits = list(collection.find()) if collection else []
+            produits = list(collection.find()) if collection is not None else []
             if produits:
                 st.success(f"📊 {len(produits)} produits trouvés")
                 for p in produits:
