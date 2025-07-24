@@ -1,12 +1,17 @@
 import streamlit as st
-from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure, ConfigurationError
+from pymongo import MongoClient, errors
+from dotenv import load_dotenv
+import os
 from datetime import datetime
 
-# ======================================
-# 🔧 CONFIGURATION DE LA CONNEXION MONGO
-# ======================================
+# ===========================
+# === CONFIGURATION STREAMLIT
+# ===========================
+st.set_page_config(page_title="Système de Gestion de Transport", page_icon="📦")
 
+# ===========================
+# === PARAMÈTRES MONGODB
+# ===========================
 MONGODB_URI = "mongodb+srv://mk18031987:UCyuhDG6l94OWXSl@cluster0.nw84anp.mongodb.net/transportdb?retryWrites=true&w=majority"
 MONGO_DB = "transportdb"
 
@@ -16,43 +21,46 @@ MONGO_COLLECTION_PANIERS = "paniers"
 MONGO_COLLECTION_COMMANDES = "commandes"
 MONGO_COLLECTION_AVIS = "avis"
 
-# Fonction de connexion MongoDB avec gestion d’erreurs
-@st.cache_resource
-def init_connection():
+# ===========================
+# === FONCTION DE CONNEXION
+# ===========================
+def connect_to_mongodb():
     try:
         client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
-        client.server_info()  # Force la connexion pour attraper les erreurs
+        client.server_info()  # Force la connexion pour déclencher une exception si échoue
         db = client[MONGO_DB]
         st.success("✅ Connexion MongoDB réussie.")
         return db
-    except (ConnectionFailure, ConfigurationError) as e:
+    except errors.ServerSelectionTimeoutError as err:
         st.error("🚫 Connexion impossible : le cluster MongoDB est hors ligne ou inaccessible.")
-        st.markdown(f"🛠️ Détail de l'erreur : `{e}`")
-        st.warning("📴 L’application fonctionne en mode déconnecté. Veuillez vérifier le serveur MongoDB.")
+        st.warning(f"🛠️ Détail de l'erreur : {err}")
+        return None
+    except Exception as e:
+        st.error("🚫 Une erreur inattendue est survenue lors de la connexion à MongoDB.")
+        st.warning(f"🛠️ Détail de l'erreur : {e}")
         return None
 
-db = init_connection()
+# ===========================
+# === CONNEXION À MONGODB
+# ===========================
+db = connect_to_mongodb()
 
-# ======================================
-# 🖼️ INTERFACE STREAMLIT (exemple simple)
-# ======================================
+# ===========================
+# === INTERFACE PRINCIPALE
+# ===========================
+st.markdown("## 📦 Système de Gestion de Transport")
 
-st.title("📦 Système de Gestion de Transport")
+if db is not None:
+    st.success("🟢 Mode connecté à MongoDB")
+    produits_col = db[MONGO_COLLECTION]
+    utilisateurs_col = db[MONGO_COLLECTION_UTILISATEURS]
+    paniers_col = db[MONGO_COLLECTION_PANIERS]
+    commandes_col = db[MONGO_COLLECTION_COMMANDES]
+    avis_col = db[MONGO_COLLECTION_AVIS]
 
-if db:
-    produits_collection = db[MONGO_COLLECTION]
-    utilisateurs_collection = db[MONGO_COLLECTION_UTILISATEURS]
-    paniers_collection = db[MONGO_COLLECTION_PANIERS]
-    commandes_collection = db[MONGO_COLLECTION_COMMANDES]
-    avis_collection = db[MONGO_COLLECTION_AVIS]
-
-    st.header("🔍 Produits disponibles")
-    produits = list(produits_collection.find())
-    
-    if produits:
-        for produit in produits:
-            st.write(f"🔹 {produit.get('nom', 'Sans nom')} - {produit.get('prix', 0)}€ (Stock: {produit.get('stock', 0)})")
-    else:
-        st.info("Aucun produit trouvé.")
+    # Exemple : afficher le nombre de produits
+    nb_produits = produits_col.count_documents({})
+    st.info(f"🔍 Produits disponibles : **{nb_produits}**")
 else:
-    st.stop()
+    st.warning("📴 L’application fonctionne en mode déconnecté. Veuillez vérifier le serveur MongoDB.")
+    st.write(f"🕒 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
