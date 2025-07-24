@@ -1,55 +1,58 @@
 import streamlit as st
-from pymongo import MongoClient, errors
-from dotenv import load_dotenv
-import os
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure, ConfigurationError
 from datetime import datetime
 
-# =============================
-# 🔐 Chargement des variables d'environnement
-# =============================
-load_dotenv()
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")  # Valeur par défaut locale
+# ======================================
+# 🔧 CONFIGURATION DE LA CONNEXION MONGO
+# ======================================
 
-# =============================
-# 🔌 Connexion MongoDB avec gestion d'erreur
-# =============================
-client = None
-db = None
+MONGODB_URI = "mongodb+srv://mk18031987:UCyuhDG6l94OWXSl@cluster0.nw84anp.mongodb.net/transportdb?retryWrites=true&w=majority"
+MONGO_DB = "transportdb"
 
-try:
-    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000, socketTimeoutMS=20000, connectTimeoutMS=20000)
-    client.server_info()  # 💡 Force une exception si le serveur est inaccessible
-    db = client["transport_db"]  # Remplace par le nom de ta base
-    st.success("✅ Connexion MongoDB réussie.")
-except errors.ServerSelectionTimeoutError as err:
-    st.error("🚫 Connexion impossible : le cluster MongoDB est hors ligne ou inaccessible.")
-    st.warning(f"🛠️ Détail de l'erreur :\n{err}")
-    db = None
-except Exception as e:
-    st.error("🚫 Une erreur inattendue est survenue lors de la connexion à MongoDB.")
-    st.warning(str(e))
-    db = None
+MONGO_COLLECTION = "produits"
+MONGO_COLLECTION_UTILISATEURS = "utilisateurs"
+MONGO_COLLECTION_PANIERS = "paniers"
+MONGO_COLLECTION_COMMANDES = "commandes"
+MONGO_COLLECTION_AVIS = "avis"
 
-# =============================
-# 🚀 App principale
-# =============================
+# Fonction de connexion MongoDB avec gestion d’erreurs
+@st.cache_resource
+def init_connection():
+    try:
+        client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+        client.server_info()  # Force la connexion pour attraper les erreurs
+        db = client[MONGO_DB]
+        st.success("✅ Connexion MongoDB réussie.")
+        return db
+    except (ConnectionFailure, ConfigurationError) as e:
+        st.error("🚫 Connexion impossible : le cluster MongoDB est hors ligne ou inaccessible.")
+        st.markdown(f"🛠️ Détail de l'erreur : `{e}`")
+        st.warning("📴 L’application fonctionne en mode déconnecté. Veuillez vérifier le serveur MongoDB.")
+        return None
+
+db = init_connection()
+
+# ======================================
+# 🖼️ INTERFACE STREAMLIT (exemple simple)
+# ======================================
+
 st.title("📦 Système de Gestion de Transport")
 
-if db is not None:
-    st.info("📡 Mode connecté : lecture depuis MongoDB")
-    try:
-        produits = list(db.produits.find())  # collection 'produits'
-        if produits:
-            st.subheader("🧾 Liste des produits")
-            for p in produits:
-                st.markdown(f"🔹 **{p.get('nom', 'Sans nom')}** - {p.get('prix', '0')}€ (Stock: {p.get('stock', '0')})")
-        else:
-            st.warning("📭 Aucun produit trouvé dans la base.")
-    except Exception as e:
-        st.error("❌ Une erreur est survenue lors de la lecture des produits.")
-        st.text(str(e))
-else:
-    st.warning("📴 L’application fonctionne en **mode déconnecté**. Veuillez vérifier le serveur MongoDB.")
+if db:
+    produits_collection = db[MONGO_COLLECTION]
+    utilisateurs_collection = db[MONGO_COLLECTION_UTILISATEURS]
+    paniers_collection = db[MONGO_COLLECTION_PANIERS]
+    commandes_collection = db[MONGO_COLLECTION_COMMANDES]
+    avis_collection = db[MONGO_COLLECTION_AVIS]
 
-# Bonus : affichage date/heure
-st.caption(f"🕒 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    st.header("🔍 Produits disponibles")
+    produits = list(produits_collection.find())
+    
+    if produits:
+        for produit in produits:
+            st.write(f"🔹 {produit.get('nom', 'Sans nom')} - {produit.get('prix', 0)}€ (Stock: {produit.get('stock', 0)})")
+    else:
+        st.info("Aucun produit trouvé.")
+else:
+    st.stop()
