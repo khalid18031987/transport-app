@@ -512,7 +512,7 @@ with tabs[2]:
                 st.warning("Aucun utilisateur disponible.")
             else:
                 utilisateur = st.selectbox("Utilisateur*", utilisateurs, key="panier_aj_utilisateur")
-                produits = [p["nom"] for p in collection.find()] if collection else []
+                produits = [p["nom"] for p in collection.find()] if collection is not None else []
                 
                 st.markdown("**📦 Sélection des produits :**")
                 cols = st.columns(2)
@@ -591,7 +591,7 @@ with tabs[3]:
                 st.warning("Aucun utilisateur trouvé.")
             else:
                 utilisateur = st.selectbox("Utilisateur*", utilisateurs, key="commande_creer_utilisateur")
-                produits = [p["nom"] for p in collection.find()] if collection else []
+                produits = [p["nom"] for p in collection.find()] if collection is not None else []
                 
                 st.markdown("**📦 Produits commandés :**")
                 produits_choisis = st.multiselect(
@@ -706,7 +706,7 @@ with tabs[4]:
     # 2. Ajout d'avis
     with avis_tab[1]:
         with st.form("ajouter_avis"):
-            produits = [p["nom"] for p in collection.find()] if collection else []
+            produits = [p["nom"] for p in collection.find()] if collection is not None else []
             utilisateurs = [u["email"] for u in collection_users.find()] if collection_users is not None else []
             
             cols = st.columns(2)
