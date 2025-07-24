@@ -495,7 +495,7 @@ with tabs[2]:
     # 1. Affichage des paniers
     with panier_tab[0]:
         if check_connection():
-            paniers = list(collection_paniers.find()) if collection_paniers else []
+            paniers = list(collection_paniers.find()) if collection_paniers is not None else []
             if paniers:
                 st.success(f"🛒 {len(paniers)} paniers trouvés")
                 for p in paniers:
