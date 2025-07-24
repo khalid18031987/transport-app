@@ -507,7 +507,11 @@ with tabs[2]:
     # 2. Ajout de panier
     with panier_tab[1]:
         with st.form("ajouter_panier"):
-            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users is not None else []            if not utilisateurs:
+            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users is not None else []
+
+if not utilisateurs:
+    # Handle the case where the utilisateurs list is empty
+    print("No users found.")
                 st.warning("Aucun utilisateur disponible.")
             else:
                 utilisateur = st.selectbox("Utilisateur*", utilisateurs, key="panier_aj_utilisateur")
