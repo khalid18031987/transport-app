@@ -472,7 +472,7 @@ with tabs[1]:
     # 3. Suppression d'utilisateur
     with user_tab[2]:
         with st.form("supprimer_utilisateur"):
-            users_list = [u["email"] for u in collection_users.find()] if collection_users else []
+            users_list = [u["email"] for u in collection_users.find()] if collection_users is not None else []
             user_email = st.selectbox("Sélectionner un utilisateur", users_list, key="user_sup_select")
             
             if st.form_submit_button("🗑️ Supprimer"):
