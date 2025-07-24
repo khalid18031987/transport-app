@@ -1,38 +1,47 @@
 import streamlit as st
 from pymongo import MongoClient, errors
-import os
 from dotenv import load_dotenv
+import os
 
-# Chargement des variables d'environnement
+# ==========================================
+# 🔧 Chargement des variables d’environnement
+# ==========================================
 load_dotenv()
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 
-def connect_to_mongodb(uri):
-    try:
-        client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-        # Tester la connexion avec un ping
-        client.admin.command("ping")
-        return client
-    except errors.ServerSelectionTimeoutError as err:
-        st.error("🚫 Connexion impossible : le cluster MongoDB est hors ligne ou inaccessible.")
-        st.error(f"Détail de l'erreur : {err}")
-        return None
-    except errors.ConnectionFailure as err:
-        st.error("❌ Échec de connexion à MongoDB.")
-        st.error(f"Détail : {err}")
-        return None
-    except Exception as e:
-        st.error("❗ Une erreur inattendue est survenue.")
-        st.error(f"Détail : {e}")
-        return None
+# ==========================================
+# 🔌 Connexion MongoDB avec gestion d’erreurs
+# ==========================================
+client = None
+db = None
+connected = False
 
-# Connexion
-client = connect_to_mongodb(MONGO_URI)
+try:
+    # Timeout plus rapide pour test local
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+    
+    # Tentative de connexion
+    client.admin.command('ping')
 
-# Utilisation de la base de données si la connexion est réussie
-if client is not None:
-    db = client["transport_db"]
-    st.success("✅ Connexion réussie à MongoDB Atlas.")
+    db = client['transport']  # Remplacez 'transport' par le nom de votre base
+    connected = True
+
+except errors.ServerSelectionTimeoutError as e:
+    st.error("🚫 Connexion impossible : le cluster MongoDB est hors ligne ou inaccessible.")
+    st.text(f"Détail : {e}")
+except errors.ConnectionFailure as e:
+    st.error("🔌 Échec de la connexion à MongoDB.")
+    st.text(f"Détail : {e}")
+except Exception as e:
+    st.error("❌ Une erreur inattendue est survenue lors de la connexion à MongoDB.")
+    st.text(f"Détail : {e}")
+
+# ==========================================
+# ✅ Utilisation si connecté
+# ==========================================
+if connected and db is not None:
+    st.success("✅ Connexion MongoDB réussie.")
+    # Exemple d'affichage de collections
+    st.write("Collections disponibles :", db.list_collection_names())
 else:
-    db = None
-    st.warning("🔌 Aucune connexion à MongoDB.")
+    st.warning("🛠️ L’application fonctionne en mode déconnecté.")
