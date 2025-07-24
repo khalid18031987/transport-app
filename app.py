@@ -297,7 +297,7 @@ def check_connection():
 # Affichage du statut de connexion
 if db is not None:
     st.markdown('<div class="connection-status connected">🟢 Connecté à MongoDB</div>', unsafe_allow_html=True)
-    nb_produits = collection.count_documents({}) if collection else 0
+    nb_produits = collection.count_documents({}) if collection is not None else 0
     st.info(f"🔍 Produits disponibles : **{nb_produits}**")
 else:
     st.markdown('<div class="connection-status disconnected">🔴 Mode déconnecté - Vérifiez la connexion MongoDB</div>', unsafe_allow_html=True)
