@@ -418,7 +418,7 @@ with tabs[1]:
     # 1. Affichage des utilisateurs
     with user_tab[0]:
         if check_connection():
-            users = list(collection_users.find()) if collection_users else []
+            users = list(collection_users.find()) if collection_users is not None else []
             if users:
                 st.success(f"👥 {len(users)} utilisateurs trouvés")
                 for u in users:
