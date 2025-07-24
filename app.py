@@ -507,7 +507,7 @@ with tabs[2]:
     # 2. Ajout de panier
     with panier_tab[1]:
         with st.form("ajouter_panier"):
-            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users else []
+            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users is not None else []
             if not utilisateurs:
                 st.warning("Aucun utilisateur disponible.")
             else:
@@ -586,7 +586,7 @@ with tabs[3]:
     # 2. Création de commande
     with commandes_tab[1]:
         with st.form("creer_commande"):
-            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users else []
+            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users is not None else []
             if not utilisateurs:
                 st.warning("Aucun utilisateur trouvé.")
             else:
@@ -707,7 +707,7 @@ with tabs[4]:
     with avis_tab[1]:
         with st.form("ajouter_avis"):
             produits = [p["nom"] for p in collection.find()] if collection else []
-            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users else []
+            utilisateurs = [u["email"] for u in collection_users.find()] if collection_users is not None else []
             
             cols = st.columns(2)
             with cols[0]:
