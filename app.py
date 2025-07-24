@@ -361,7 +361,7 @@ with tabs[0]:
     # 3. Suppression de produit
     with prod_tab[2]:
         with st.form("supprimer_produit"):
-            produits_liste = [p["nom"] for p in collection.find()] if collection else []
+            produits_liste = [p["nom"] for p in collection.find()] if collection is not None else []
             produit = st.selectbox("Sélectionner un produit à supprimer", produits_liste, key="prod_sup_select")
             
             if st.form_submit_button("🗑️ Supprimer"):
