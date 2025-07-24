@@ -523,13 +523,7 @@ with tabs[2]:
                             f"Quantité pour {produit}",
                             0, 
                             key=f"panier_aj_qte_{produit}",
-                            if collection is not None:
-    produit_data = collection.find_one({'nom': produit})
-    stock = produit_data['stock'] if produit_data and 'stock' in produit_data else 0
-else:
-    stock = 0
-
-help = f"Stock disponible: {stock}"
+                            help=f"Stock disponible: {collection.find_one({'nom': produit})['stock'] if collection and collection.find_one({'nom': produit}) else 0}"
                         )
                         if qte > 0:
                             quantites[produit] = qte
